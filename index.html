@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SafeZone - Sex Offender Registry Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"/>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #map { 
+            height: 100vh; 
+            width: 100%; 
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .search-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            width: 420px;
+            backdrop-filter: blur(10px);
+        }
+
+        .app-title {
+            color: white;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .app-description {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px 50px 16px 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .search-input::placeholder {
+            color: #999;
+        }
+
+        .search-button {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .search-button:hover {
+            transform: translateY(-50%) scale(1.05);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .search-button:active {
+            transform: translateY(-50%) scale(0.98);
+        }
+
+        .info-text {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            text-align: center;
+            margin-top: 14px;
+            font-style: italic;
+        }
+
+        .loading {
+            display: none;
+            color: white;
+            font-size: 15px;
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .legend-section {
+            margin-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            padding-top: 18px;
+        }
+
+        .legend-header {
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+
+        .legend-header:hover {
+            opacity: 0.8;
+        }
+
+        .legend-arrow {
+            transition: transform 0.3s ease;
+            font-size: 14px;
+        }
+
+        .legend-arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .legend-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease;
+        }
+
+        .legend-content.open {
+            max-height: 500px;
+        }
+
+        .legend-items {
+            padding-top: 16px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 14px;
+        }
+
+        .legend-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .cluster-green {
+            background-color: #b5e28c;
+            color: #1e5631;
+        }
+
+        .cluster-yellow {
+            background-color: #f1d357;
+            color: #805a0b;
+        }
+
+        .cluster-orange {
+            background-color: #fd9c73;
+            color: #6b2c0d;
+        }
+
+        .cluster-red {
+            background-color: #f97272;
+            color: #6e0000;
+        }
+
+        .marker-blue {
+            width: 25px;
+            height: 41px;
+            margin-right: 18px;
+            margin-left: 7px;
+            position: relative;
+        }
+
+        .marker-blue svg {
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+        }
+
+        .legend-text {
+            line-height: 1.4;
+        }
+
+        @media (max-width: 768px) {
+            .search-panel {
+                width: calc(100% - 40px);
+                padding: 20px;
+            }
+
+            .app-title {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="search-panel">
+    <h1 class="app-title">SafeZone</h1>
+    <p class="app-description">
+        Type your location to view registered offenders in your area in Texas. Stay informed, stay safe.
+    </p>
+    
+    <div class="search-container">
+        <input 
+            type="text" 
+            id="locationInput" 
+            class="search-input" 
+            placeholder="Enter ZIP code or city (e.g., 78701, Austin)"
+            autocomplete="off"
+        />
+        <button class="search-button" onclick="searchLocation()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+            </svg>
+        </button>
+    </div>
+    
+    <div class="loading" id="loadingText">Searching location...</div>
+    
+    <p class="info-text">
+        Or explore the map freely by zooming and panning
+    </p>
+
+    <!-- Legend Section -->
+    <div class="legend-section">
+        <div class="legend-header" onclick="toggleLegend()">
+            <span>How to Read the Map</span>
+            <span class="legend-arrow" id="legendArrow">▼</span>
+        </div>
+        <div class="legend-content" id="legendContent">
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-icon cluster-green">10</div>
+                    <div class="legend-text"><strong>Green Cluster (2-10 offenders)</strong> - Safer area with few offenders</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon cluster-yellow">50</div>
+                    <div class="legend-text"><strong>Yellow Cluster (11-100 offenders)</strong> - Moderate number of offenders</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon cluster-orange">250</div>
+                    <div class="legend-text"><strong>Orange Cluster (101-500 offenders)</strong> - Higher concentration of offenders</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon cluster-red">1000</div>
+                    <div class="legend-text"><strong>Red Cluster (500+ offenders)</strong> - Very high concentration of offenders</div>
+                </div>
+                <div class="legend-item">
+                    <div class="marker-blue">
+                        <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12.5 0C5.596 0 0 5.596 0 12.5c0 9.375 12.5 28.125 12.5 28.125S25 21.875 25 12.5C25 5.596 19.404 0 12.5 0z" fill="#2A81CB"/>
+                            <circle cx="12.5" cy="12.5" r="5" fill="white"/>
+                        </svg>
+                    </div>
+                    <div class="legend-text"><strong>Blue Pin</strong> - Individual registered sex offender location. Click to view details.</div>
+                </div>
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.2);">
+                    <p style="color: rgba(255, 255, 255, 0.85); font-size: 13px; line-height: 1.5;">
+                        <strong>Tip:</strong> Click on any cluster to zoom in and reveal individual offender locations. Zoom in further to see exact addresses.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+<!-- Markers through main.cpp -->
+<script src="markers.js"></script>
+
+<script>
+    var map = L.map('map').setView([31.0, -102.5], 6);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    var markersCluster = L.markerClusterGroup();
+
+    for (var i = 0; i < markers.length; i++) {
+        var m = markers[i];
+        var marker = L.marker([m.lat, m.lon]);
+        var nameLabel = m.name ? m.name : "No Name";
+        marker.bindPopup("ID: " + m.id + "<br>Name: " + nameLabel);
+        markersCluster.addLayer(marker);
+    }
+
+    map.addLayer(markersCluster);
+
+    // Search functionality
+    function searchLocation() {
+        var location = document.getElementById('locationInput').value.trim();
+        
+        if (!location) {
+            alert('Please enter a location');
+            return;
+        }
+
+        var loadingText = document.getElementById('loadingText');
+        loadingText.classList.add('active');
+
+        // Use Nominatim geocoding API (OpenStreetMap)
+        var geocodeUrl = 'https://nominatim.openstreetmap.org/search?format=json&q=' + 
+                         encodeURIComponent(location + ', Texas, USA') + '&limit=1';
+
+        fetch(geocodeUrl)
+            .then(response => response.json())
+            .then(data => {
+                loadingText.classList.remove('active');
+                
+                if (data && data.length > 0) {
+                    var lat = parseFloat(data[0].lat);
+                    var lon = parseFloat(data[0].lon);
+                    
+                    // Zoom to location
+                    map.setView([lat, lon], 13, {
+                        animate: true,
+                        duration: 1.5
+                    });
+                } else {
+                    alert('Location not found. Please try a different ZIP code or city name.');
+                }
+            })
+            .catch(error => {
+                loadingText.classList.remove('active');
+                console.error('Geocoding error:', error);
+                alert('Error searching location. Please try again.');
+            });
+    }
+
+    // Allow Enter key to search
+    document.getElementById('locationInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchLocation();
+        }
+    });
+
+    // Toggle legend dropdown
+    function toggleLegend() {
+        var content = document.getElementById('legendContent');
+        var arrow = document.getElementById('legendArrow');
+        
+        content.classList.toggle('open');
+        arrow.classList.toggle('open');
+    }
+</script>
+</body>
+</html>
